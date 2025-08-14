@@ -1,0 +1,26 @@
+
+### 2. package.json
+
+If your project uses Node.js or any package manager, you might want to include a `package.json` file. Here’s an example:
+
+```json
+{
+  "name": "aylos9er",
+  "version": "1.0.0",
+  "description": "3D simulation application visualizing a modified version of Conway's Game of Life.",
+  "main": "index.html",
+  "scripts": {
+    "start": "live-server"
+  },
+  "keywords": [
+    "threejs",
+    "simulation",
+    "gameoflife"
+  ],
+  "author": "msmosij@gmail.com",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.128.0",
+    "live-server": "^1.2.1"
+  }
+}
