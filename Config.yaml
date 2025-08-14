@@ -1,0 +1,11 @@
+site:
+  title: "Aylos9er | Zero-Py Tesseract"
+  description: "3D simulation application visualizing a modified version of Conway's Game of Life."
+  author: "msmosij@gmail.com"
+  license: "MIT"
+
+features:
+  - "3D Visualization"
+  - "Interactive Chat Interface"
+  - "Bridge Creation"
+  - "Mesh Deformation"
