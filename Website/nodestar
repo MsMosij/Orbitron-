@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>aylos9er | Weaver Forge & Live Art</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- New: Import the cellular automata library -->
+    <script type="module">
+      import { CellularAutomata } from 'https://cdn.jsdelivr.net/npm/@andreas-stg/cellular-automata-js@1.0.0/dist/cellular-automata.js';
+      window.CellularAutomata = CellularAutomata;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body { margin: 0; overflow: hidden; font-family: 'Orbitron', sans-serif; }
+        canvas { display: block; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .interactive-element { pointer-events: auto; }
+        
+        /* Retro-future design elements */
+        .brave-border {
+            border: 2px solid #00ffff; /* Electric Cyan */
+            box-shadow: 0 0 10px #00ffff, inset 0 0 5px #00ffff;
+            background-color: rgba(17, 24, 39, 0.85); /* A slightly darker gray */
+            backdrop-filter: blur(8px);
+        }
+        .brave-text {
+            color: #ff00ff; /* Neon Magenta */
+            text-shadow: 0 0 5px #ff00ff;
+        }
+        .brave-chat-input {
+            border-top: 2px solid #00ff00; /* Neon Green */
+            background-color: rgba(31, 41, 55, 0.7);
+            color: #00ffff;
+            text-shadow: 0 0 2px #00ffff;
+        }
+        .chat-message {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            font-family: 'Inter', sans-serif;
+            text-shadow: none;
+        }
+        .chat-user {
+            color: #00ffff;
+        }
+        .chat-system {
+            color: #ff00ff;
+        }
+        .grid-button.active, #bridge-btn.active, #mesh-deform-btn.active, #zeropy-btn.active {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.4), 0 0 20px rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <div id="overlay">
+        <div class="p-4 flex h-full">
+            <!-- Left Side: Chat UI -->
+            <div id="chat-container" class="brave-border interactive-element w-1/3 flex flex-col p-4 mr-4 rounded-xl">
+                <h2 class="text-xl font-bold brave-text text-center mb-4">Triad Entity Chat</h2>
+                <div id="chat-display" class="flex-grow overflow-y-auto brave-border p-2 rounded-lg mb-4">
+                    <!-- Chat messages will be appended here -->
+                    <div class="chat-message chat-system">System: Weaver Forge active. Commands: /start, /stop, /reset, /design [voxel|sphere|mesh], /zeropy, /art</div>
+                </div>
+                <div class="flex">
+                    <input type="text" id="chat-input" class="brave-chat-input flex-grow rounded-lg p-2 mr-2 outline-none text-sm" placeholder="Enter command or message...">
+                    <button id="chat-send-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">Send</button>
+                </div>
+            </div>
+
+            <!-- Right Side: Main Controls and Instructions -->
+            <div class="flex-grow flex flex-col items-center justify-start">
+                <div class="bg-gray-800 bg-opacity-70 backdrop-blur-sm rounded-xl p-4 shadow-lg mb-4 interactive-element">
+                    <h1 class="text-3xl font-bold text-center text-violet-400">aylos9er | Weaver Forge PoC</h1>
+                    <p class="text-sm text-center text-gray-400">Crafting the digital fabric of life</p>
+                </div>
+
+                <div id="controls" class="bg-gray-800 bg-opacity-70 backdrop-blur-sm rounded-xl p-4 shadow-lg space-y-4 interactive-element">
+                    <div class="flex space-x-2">
+                        <button id="start-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 w-28">Start</button>
+                        <button id="stop-btn" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 w-28">Stop</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button id="voxel-btn" class="grid-button bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm active">Voxel Grid</button>
+                        <button id="sphere-btn" class="grid-button bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">Sphere Swarm</button>
+                        <button id="mesh-btn" class="grid-button bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">Relational Mesh</button>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button id="bridge-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">Weave Bridges</button>
+                        <button id="mesh-deform-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">Deform Mesh</button>
+                        <button id="zeropy-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">Zeropy Rule</button>
+                        <button id="art-mode-btn" class="bg-lime-600 hover:bg-lime-700 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-200 text-xs sm:text-sm">CA Art</button>
+                    </div>
+                    <button id="reset-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 w-full">Reset All</button>
+                </div>
+                
+                <div id="message-box" class="mt-4 p-3 bg-gray-700 bg-opacity-70 backdrop-blur-sm rounded-lg shadow-md text-sm text-center text-white" style="display: none;"></div>
+
+                <div class="mt-auto bg-gray-800 bg-opacity-70 backdrop-blur-sm rounded-xl p-4 shadow-lg interactive-element">
+                    <p class="text-sm text-gray-300 text-center">
+                        **Controls:** Drag to rotate, scroll to zoom.
+                        <br>
+                        **Weave Bridges:** Click on two cells to connect them.
+                        <br>
+                        **Deform Mesh:** Click on the grid to create a ripple.
+                        <br>
+                        **Zeropy Rule:** Toggles a non-standard CA logic.
+                        <br>
+                        **CA Art:** Toggles a 2D Game of Life visualization.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- New Canvas for 2D Cellular Automata -->
+    <canvas id="ca-canvas" style="display: none;"></canvas>
+
+    <script>
+        window.onload = function() {
+            // --- Scene Setup ---
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            camera.position.set(25, 25, 25);
+            controls.target.set(0, 0, 0);
+            controls.update();
+
+            const ambientLight = new THREE.AmbientLight(0x404040, 5);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+
+            // --- Global State and Parameters ---
+            const grid_size = 20;
+            let current_grid = createRandomGrid(grid_size);
+            let simulationRunning = false;
+            let currentDesign = 'voxel';
+            let animationId;
+            let zeropyMode = false;
+            let caArtMode = false;
+
+            let voxel_group, sphere_group, mesh_group, bridge_group;
+            
+            let bridgeMode = false;
+            let bridgePoints = [];
+            let deformMode = false;
+
+            const meshSize = grid_size * 2;
+            const meshGridDivisions = 40;
+            let interfaceMesh, originalVertices, deformedVertices;
+            
+            const hyper_lane_bridges = [];
+            let bridge_lines = [];
+
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            const messageBox = document.getElementById('message-box');
+            
+            // --- New: 2D Canvas for Game of Life Art ---
+            const caCanvas = document.getElementById('ca-canvas');
+            const caCtx = caCanvas.getContext('2d');
+            let caSimulation;
+
+            function setupCAArt() {
+                caCanvas.width = window.innerWidth;
+                caCanvas.height = window.innerHeight;
+                caCanvas.style.display = 'block';
+                renderer.domElement.style.display = 'none';
+                
+                const gridSize = 100;
+                caSimulation = new window.CellularAutomata({
+                    cols: gridSize,
+                    rows: gridSize,
+                    size: 100 / gridSize, // Adjust cell size for a full grid
+                    canvas: caCanvas,
+                });
+                
+                caSimulation.setRule('Conway');
+                caSimulation.randomize();
+                
+                function caAnimate() {
+                    if (caArtMode) {
+                        caSimulation.step();
+                        caSimulation.render();
+                        requestAnimationFrame(caAnimate);
+                    }
+                }
+                caAnimate();
+            }
+
+            function teardownCAArt() {
+                caCanvas.style.display = 'none';
+                renderer.domElement.style.display = 'block';
+                if (caSimulation) {
+                    caSimulation.destroy();
+                }
+            }
+
+            // --- Chat UI & Command Handling ---
+            const chatDisplay = document.getElementById('chat-display');
+            const chatInput = document.getElementById('chat-input');
+            const chatSendBtn = document.getElementById('chat-send-btn');
+
+            function appendMessage(sender, message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('chat-message');
+                if (sender === 'user') {
+                    messageDiv.classList.add('chat-user');
+                    messageDiv.innerHTML = `<span class="font-bold brave-text">User:</span> ${message}`;
+                } else if (sender === 'system') {
+                    messageDiv.classList.add('chat-system');
+                    messageDiv.innerHTML = `<span class="font-bold brave-text">System:</span> ${message}`;
+                }
+                chatDisplay.appendChild(messageDiv);
+                chatDisplay.scrollTop = chatDisplay.scrollHeight; // Auto-scroll to bottom
+            }
+
+            function handleChatCommand(command) {
+                const parts = command.split(' ');
+                const cmd = parts[0].toLowerCase();
+                const arg = parts[1] ? parts[1].toLowerCase() : null;
+
+                switch (cmd) {
+                    case '/start':
+                        document.getElementById('start-btn').click();
+                        appendMessage('system', 'Simulation started.');
+                        break;
+                    case '/stop':
+                        document.getElementById('stop-btn').click();
+                        appendMessage('system', 'Simulation stopped.');
+                        break;
+                    case '/reset':
+                        document.getElementById('reset-btn').click();
+                        appendMessage('system', 'All systems reset.');
+                        break;
+                    case '/design':
+                        if (arg === 'voxel') {
+                            document.getElementById('voxel-btn').click();
+                            appendMessage('system', 'Visualizing Voxel Grid.');
+                        } else if (arg === 'sphere') {
+                            document.getElementById('sphere-btn').click();
+                            appendMessage('system', 'Visualizing Sphere Swarm.');
+                        } else if (arg === 'mesh') {
+                            document.getElementById('mesh-btn').click();
+                            appendMessage('system', 'Visualizing Relational Mesh.');
+                        } else {
+                            appendMessage('system', 'Unknown design. Use: /design [voxel|sphere|mesh]');
+                        }
+                        break;
+                    case '/zeropy':
+                        document.getElementById('zeropy-btn').click();
+                        appendMessage('system', `Zeropy rule toggled to: ${zeropyMode}`);
+                        break;
+                    case '/art':
+                        document.getElementById('art-mode-btn').click();
+                        appendMessage('system', `CA Art mode toggled to: ${caArtMode}`);
+                        break;
+                    default:
+                        appendMessage('system', `Unknown command: ${command}`);
+                }
+            }
+
+            function sendChatMessage() {
+                const message = chatInput.value.trim();
+                if (message === '') return;
+                
+                appendMessage('user', message);
+                chatInput.value = '';
+
+                if (message.startsWith('/')) {
+                    handleChatCommand(message);
+                } else {
+                    appendMessage('system', `Message received: "${message}"`);
+                }
+            }
+            
+            chatSendBtn.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
+
+            function showMessage(msg) {
+                messageBox.innerText = msg;
+                messageBox.style.display = 'block';
+                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
+            }
+
+            // --- Core Game of Life Logic ---
+            function createRandomGrid(size) {
+                const grid = [];
+                for (let x = 0; x < size; x++) {
+                    grid[x] = [];
+                    for (let y = 0; y < size; y++) {
+                        grid[x][y] = [];
+                        for (let z = 0; z < size; z++) {
+                            grid[x][y][z] = Math.random() > 0.8 ? 1 : 0;
+                        }
+                    }
+                }
+                return grid;
+            }
+
+            function updateGrid(grid) {
+                const new_grid = JSON.parse(JSON.stringify(grid));
+                const size = grid.length;
+
+                for (let x = 0; x < size; x++) {
+                    for (let y = 0; y < size; y++) {
+                        for (let z = 0; z < size; z++) {
+                            // Decay logic (asc4)
+                            if (grid[x][y][z] === 2) {
+                                new_grid[x][y][z] = 0; // Decaying cells always die
+                                continue;
+                            }
+
+                            let live_neighbors = 0;
+                            
+                            for (let dx = -1; dx <= 1; dx++) {
+                                for (let dy = -1; dy <= 1; dy++) {
+                                    for (let dz = -1; dz <= 1; dz++) {
+                                        if (dx === 0 && dy === 0 && dz === 0) continue;
+
+                                        const nx = (x + dx + size) % size;
+                                        const ny = (y + dy + size) % size;
+                                        const nz = (z + dz + size) % size;
+
+                                        if (grid[nx][ny][nz] === 1 || grid[nx][ny][nz] === 2) {
+                                            live_neighbors++;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            for (const bridge of hyper_lane_bridges) {
+                                if (bridge.from.x === x && bridge.from.y === y && bridge.from.z === z) {
+                                    if (grid[bridge.to.x][bridge.to.y][bridge.to.z] === 1 || grid[bridge.to.x][bridge.to.y][bridge.to.z] === 2) {
+                                        live_neighbors++;
+                                    }
+                                } else if (bridge.to.x === x && bridge.to.y === y && bridge.to.z === z) {
+                                    if (grid[bridge.from.x][bridge.from.y][bridge.from.z] === 1 || grid[bridge.from.x][bridge.from.y][bridge.from.z] === 2) {
+                                        live_neighbors++;
+                                    }
+                                }
+                            }
+                            
+                            // Zeropy Rule: Toggles state if neighbor count is exactly 4
+                            if (zeropyMode) {
+                                if (live_neighbors === 4) {
+                                    new_grid[x][y][z] = grid[x][y][z] === 1 ? 0 : 1;
+                                }
+                            } else {
+                                // Standard 3D Game of Life rules
+                                if (grid[x][y][z] === 1) {
+                                    if (live_neighbors < 5 || live_neighbors > 7) {
+                                        new_grid[x][y][z] = 2; // Decay to state 2
+                                    }
+                                } else {
+                                    if (live_neighbors === 6) {
+                                        new_grid[x][y][z] = 1; // Becomes alive
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return new_grid;
+            }
+
+            // --- Designs (The Triad) ---
+            function getMeshHeight(x, y) {
+                if (!interfaceMesh) return 0;
+                const vertexIndex = (y + grid_size/2) * (meshGridDivisions + 1) + (x + grid_size/2);
+                if (vertexIndex < deformedVertices.length/3) {
+                    return deformedVertices[vertexIndex * 3 + 2];
+                }
+                return 0;
+            }
+
+            function createVoxelGrid() {
+                if (voxel_group) scene.remove(voxel_group);
+                voxel_group = new THREE.Group();
+                const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+                
+                for (let x = 0; x < grid_size; x++) {
+                    for (let y = 0; y < grid_size; y++) {
+                        for (let z = 0; z < grid_size; z++) {
+                            if (current_grid[x][y][z] === 1 || current_grid[x][y][z] === 2) {
+                                let material;
+                                if (current_grid[x][y][z] === 1) {
+                                    material = new THREE.MeshLambertMaterial({ color: 0x22c55e });
+                                } else {
+                                    material = new THREE.MeshLambertMaterial({ color: 0x808080 }); // Gray for decaying cells
+                                }
+                                const cube = new THREE.Mesh(geometry, material);
+                                cube.position.set(x - grid_size/2, y - grid_size/2, z - grid_size/2);
+                                cube.position.z += getMeshHeight(x, y);
+                                voxel_group.add(cube);
+                            }
+                        }
+                    }
+                }
+                scene.add(voxel_group);
+            }
+
+            function createSphereSwarm() {
+                if (sphere_group) scene.remove(sphere_group);
+                sphere_group = new THREE.Group();
+                const geometry = new THREE.SphereGeometry(0.45, 16, 16);
+                
+                for (let x = 0; x < grid_size; x++) {
+                    for (let y = 0; y < grid_size; y++) {
+                        for (let z = 0; z < grid_size; z++) {
+                            if (current_grid[x][y][z] === 1 || current_grid[x][y][z] === 2) {
+                                let material;
+                                if (current_grid[x][y][z] === 1) {
+                                    material = new THREE.MeshPhongMaterial({
+                                        color: 0xec4899, emissive: 0xec4899, emissiveIntensity: 0.5, shininess: 100
+                                    });
+                                } else {
+                                    material = new THREE.MeshPhongMaterial({
+                                        color: 0x808080, emissive: 0x808080, emissiveIntensity: 0.2, shininess: 50
+                                    });
+                                }
+                                const sphere = new THREE.Mesh(geometry, material);
+                                sphere.position.set(x - grid_size/2, y - grid_size/2, z - grid_size/2);
+                                sphere.position.z += getMeshHeight(x, y);
+                                sphere_group.add(sphere);
+                            }
+                        }
+                    }
+                }
+                scene.add(sphere_group);
+            }
+
+            function createMesh() {
+                if (mesh_group) scene.remove(mesh_group);
+                mesh_group = new THREE.Group();
+
+                const positions = [];
+                
+                for (let x = 0; x < grid_size; x++) {
+                    for (let y = 0; y < grid_size; y++) {
+                        for (let z = 0; z < grid_size; z++) {
+                            if (current_grid[x][y][z] === 1 || current_grid[x][y][z] === 2) {
+                                let vz = z - grid_size/2;
+                                vz += getMeshHeight(x, y);
+                                positions.push(x - grid_size/2, y - grid_size/2, vz);
+                            }
+                        }
+                    }
+                }
+                
+                const pointsGeometry = new THREE.BufferGeometry();
+                pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                const pointsMaterial = new THREE.PointsMaterial({ color: 0xfbbf24, size: 0.5 });
+                const points = new THREE.Points(pointsGeometry, pointsMaterial);
+                mesh_group.add(points);
+
+                const linesGeometry = new THREE.BufferGeometry();
+                const linePositions = [];
+                for (let x = 0; x < grid_size; x++) {
+                    for (let y = 0; y < grid_size; y++) {
+                        for (let z = 0; z < grid_size; z++) {
+                            if (current_grid[x][y][z] === 1 || current_grid[x][y][z] === 2) {
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    for (let dy = -1; dy <= 1; dy++) {
+                                        for (let dz = -1; dz <= 1; dz++) {
+                                            if (dx === 0 && dy === 0 && dz === 0) continue;
+                                            
+                                            if (dx >= 0 && dy >= 0 && dz >= 0 && (dx+dy+dz) > 0) {
+                                                const nx = (x + dx + grid_size) % grid_size;
+                                                const ny = (y + dy + grid_size) % grid_size;
+                                                const nz = (z + dz + grid_size) % grid_size;
+                                                
+                                                if (current_grid[nx][ny][nz] === 1 || current_grid[nx][ny][nz] === 2) {
+                                                    let vz1 = z - grid_size/2;
+                                                    let vz2 = nz - grid_size/2;
+                                                    vz1 += getMeshHeight(x, y);
+                                                    vz2 += getMeshHeight(nx, ny);
+                                                    
+                                                    linePositions.push(x - grid_size/2, y - grid_size/2, vz1);
+                                                    linePositions.push(nx - grid_size/2, ny - grid_size/2, vz2);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+                const material = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.8 });
+                const lines = new THREE.LineSegments(linesGeometry, material);
+                mesh_group.add(lines);
+
+                scene.add(mesh_group);
+            }
+
+            // --- Hyper Lane Bridge Logic (Tesseract Bridge) ---
+            function createTesseractBridgeVisuals() {
+                if (bridge_group) scene.remove(bridge_group);
+                bridge_group = new THREE.Group();
+
+                for (const bridge of hyper_lane_bridges) {
+                    const fromPos = new THREE.Vector3(bridge.from.x - grid_size/2, bridge.from.y - grid_size/2, bridge.from.z - grid_size/2 + getMeshHeight(bridge.from.x, bridge.from.y));
+                    const toPos = new THREE.Vector3(bridge.to.x - grid_size/2, bridge.to.y - grid_size/2, bridge.to.z - grid_size/2 + getMeshHeight(bridge.to.x, bridge.to.y));
+                    const geometry = new THREE.BufferGeometry().setFromPoints([fromPos, toPos]);
+                    const material = new THREE.LineBasicMaterial({ color: 0x8a2be2, linewidth: 2 });
+                    const line = new THREE.Line(geometry, material);
+                    bridge_group.add(line);
+                }
+
+                if (hyper_lane_bridges.length > 0) {
+                    const tesseractMaterial = new THREE.LineBasicMaterial({
+                        color: new THREE.Color().setHSL(0.5 + Math.sin(Date.now() * 0.001) * 0.5, 1.0, 0.5),
+                        linewidth: 3,
+                        blending: THREE.AdditiveBlending,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+
+                    const tesseractPoints = [];
+                    for (const bridge of hyper_lane_bridges) {
+                        tesseractPoints.push(new THREE.Vector3(
+                            bridge.from.x - grid_size/2, bridge.from.y - grid_size/2, bridge.from.z - grid_size/2 + getMeshHeight(bridge.from.x, bridge.from.y)
+                        ));
+                        tesseractPoints.push(new THREE.Vector3(
+                            bridge.to.x - grid_size/2, bridge.to.y - grid_size/2, bridge.to.z - grid_size/2 + getMeshHeight(bridge.to.x, bridge.to.y)
+                        ));
+                    }
+                    if (tesseractPoints.length > 1) {
+                        const tesseractGeometry = new THREE.BufferGeometry().setFromPoints(tesseractPoints);
+                        const tesseractLines = new THREE.LineSegments(tesseractGeometry, tesseractMaterial);
+                        bridge_group.add(tesseractLines);
+                    }
+                }
+
+                scene.add(bridge_group);
+            }
+
+            
+            // --- Interface Mesh Logic ---
+            function createInterfaceMesh() {
+                if (interfaceMesh) scene.remove(interfaceMesh);
+                const geometry = new THREE.PlaneGeometry(meshSize, meshSize, meshGridDivisions, meshGridDivisions);
+                geometry.rotateX(-Math.PI / 2);
+                originalVertices = geometry.attributes.position.clone();
+                deformedVertices = new Float32Array(originalVertices.array);
+
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x4b5563,
+                    side: THREE.DoubleSide,
+                    flatShading: true,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                interfaceMesh = new THREE.Mesh(geometry, material);
+                interfaceMesh.position.set(0, -grid_size/2, 0);
+                interfaceMesh.name = 'interface_mesh';
+                scene.add(interfaceMesh);
+            }
+
+            function deformInterfaceMesh(point) {
+                if (!interfaceMesh) return;
+                const positions = interfaceMesh.geometry.attributes.position;
+                const center = new THREE.Vector3(point.x, point.y, 0);
+
+                for (let i = 0; i < positions.count; i++) {
+                    const vertex = new THREE.Vector3().fromBufferAttribute(originalVertices, i);
+                    const distance = center.distanceTo(vertex);
+                    const strength = 10;
+                    const falloff = 10;
+                    
+                    if (distance < falloff) {
+                        const deformation = (1 - (distance / falloff)) * strength;
+                        deformedVertices[i * 3 + 2] = originalVertices.array[i * 3 + 2] + deformation;
+                    } else {
+                        deformedVertices[i * 3 + 2] = originalVertices.array[i * 3 + 2];
+                    }
+                }
+                positions.array.set(deformedVertices);
+                positions.needsUpdate = true;
+                if (simulationRunning) {
+                  updateVisualization();
+                }
+            }
+
+
+            // --- Animation Loop & Controls ---
+            function render() {
+                animationId = requestAnimationFrame(render);
+                if (simulationRunning && !caArtMode) {
+                    current_grid = updateGrid(current_grid);
+                    updateVisualization();
+                }
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            
+            function updateVisualization() {
+                if (currentDesign === 'voxel') {
+                    createVoxelGrid();
+                } else if (currentDesign === 'sphere') {
+                    createSphereSwarm();
+                } else if (currentDesign === 'mesh') {
+                    createMesh();
+                }
+                createTesseractBridgeVisuals();
+            }
+
+            // Initial setup
+            createInterfaceMesh();
+            updateVisualization();
+            render();
+
+            // --- UI Button Handlers ---
+            document.getElementById('start-btn').addEventListener('click', () => {
+                simulationRunning = true;
+                showMessage("Simulation started.");
+            });
+            document.getElementById('stop-btn').addEventListener('click', () => {
+                simulationRunning = false;
+                showMessage("Simulation paused.");
+            });
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                simulationRunning = false;
+                current_grid = createRandomGrid(grid_size);
+                hyper_lane_bridges.length = 0;
+                bridgePoints.length = 0;
+                
+                if (interfaceMesh && originalVertices) {
+                  interfaceMesh.geometry.attributes.position.copy(originalVertices);
+                  interfaceMesh.geometry.attributes.position.needsUpdate = true;
+                  deformedVertices = new Float32Array(originalVertices.array);
+                }
+
+                updateVisualization();
+                createTesseractBridgeVisuals();
+                showMessage("All systems reset.");
+            });
+
+            document.getElementById('voxel-btn').addEventListener('click', (e) => {
+                currentDesign = 'voxel';
+                document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                if (sphere_group) scene.remove(sphere_group);
+                if (mesh_group) scene.remove(mesh_group);
+                createVoxelGrid();
+            });
+            document.getElementById('sphere-btn').addEventListener('click', (e) => {
+                currentDesign = 'sphere';
+                document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                if (voxel_group) scene.remove(voxel_group);
+                if (mesh_group) scene.remove(mesh_group);
+                createSphereSwarm();
+            });
+            document.getElementById('mesh-btn').addEventListener('click', (e) => {
+                currentDesign = 'mesh';
+                document.querySelectorAll('.grid-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                if (voxel_group) scene.remove(voxel_group);
+                if (sphere_group) scene.remove(sphere_group);
+                createMesh();
+            });
+            document.getElementById('bridge-btn').addEventListener('click', (e) => {
+                bridgeMode = !bridgeMode;
+                deformMode = false;
+                document.getElementById('mesh-deform-btn').classList.remove('active');
+                if (bridgeMode) {
+                    showMessage("Bridge Mode: Click on two cells to connect them.");
+                    e.target.classList.add('active');
+                } else {
+                    showMessage("Bridge Mode off.");
+                    e.target.classList.remove('active');
+                    bridgePoints = [];
+                }
+            });
+            document.getElementById('mesh-deform-btn').addEventListener('click', (e) => {
+                deformMode = !deformMode;
+                bridgeMode = false;
+                document.getElementById('bridge-btn').classList.remove('active');
+                if (deformMode) {
+                    showMessage("Deform Mode: Click on the mesh to create a ripple.");
+                    e.target.classList.add('active');
+                } else {
+                    showMessage("Deform Mode off.");
+                    e.target.classL
