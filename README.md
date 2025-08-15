@@ -24,5 +24,5 @@ Aylos9er is a 3D simulation application that visualizes a modified version of Co
 ### Running the Application Locally
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/aylos9er.git
-   cd aylos9er
+   git clone https://github.com/yourusername/serverzero.git
+   cd serverzero
